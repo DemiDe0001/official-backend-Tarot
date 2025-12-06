@@ -1,61 +1,68 @@
-// Load environment variables
-require("dotenv").config();
-
-const express = require("express");
-const cors = require("cors");
-const OpenAI = require("openai");
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import OpenAI from "openai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize OpenAI client with your Render environment variable
+// OpenAI client using your Render environment variable
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Route: Tarot Reading
+// Health check route
+app.get("/", (req, res) => {
+  res.send("Tarot backend is live ✨");
+});
+
+// Main tarot reading route
 app.post("/reading", async (req, res) => {
   try {
-    const { cards, question } = req.body;
+    const { cards, question } = req.body || {};
 
-    if (!cards || cards.length === 0) {
-      return res.status(400).json({ error: "No cards provided." });
-    }
+    const safeQuestion =
+      question && question.trim().length > 0
+        ? question.trim()
+        : "No specific question. Give general guidance.";
+
+    const cardList = Array.isArray(cards)
+      ? cards.join(", ")
+      : JSON.stringify(cards);
 
     const prompt = `
-You are a mystical AI tarot reader. Provide a clear but powerful reading.
+You are an intuitive, kind tarot reader.
+Give a clear, empowering reading based on the user's question and cards.
 
-User Question: ${question || "No question provided."}
-Cards Drawn: ${cards.join(", ")}
+Question: ${safeQuestion}
+Cards: ${cardList}
 
-Give a deep but friendly interpretation:
-- What the cards reveal
-- Emotional + spiritual guidance
-- What to do next
-    `;
+Structure:
+1. Overall energy (2–3 sentences)
+2. What the cards are trying to tell them
+3. 3–5 practical next steps
+Keep it encouraging. No doom, no scary predictions.
+    `.trim();
 
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+    const response = await client.responses.create({
+      model: "gpt-4.1-mini",
+      input: prompt,
     });
 
-    res.json({
-      message: completion.choices[0].message.content,
-    });
-  } catch (error) {
-    console.error("Tarot API Error:", error);
-    res.status(500).json({ error: "Tarot reading failed." });
+    const text =
+      response.output?.[0]?.content?.[0]?.text ||
+      "I sense a turning point ahead. Trust your intuition and stay open to small changes you can control.";
+
+    res.json({ reading: text });
+  } catch (err) {
+    console.error("Tarot AI error:", err);
+    res.status(500).json({ error: "Failed to generate tarot reading." });
   }
 });
 
-// Default home route
-app.get("/", (req, res) => {
-  res.send("Tarot Backend Running Successfully 🌙🔮");
-});
-
-// Render requires dynamic PORT
+// Use Render's port or default to 3000 locally
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Tarot backend listening on port ${PORT}`);
 });

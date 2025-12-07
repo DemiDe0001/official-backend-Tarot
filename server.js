@@ -3,7 +3,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 
-// Load environment variables from Render / .env
 dotenv.config();
 
 const app = express();

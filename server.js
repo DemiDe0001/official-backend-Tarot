@@ -1,68 +1,86 @@
-import "dotenv/config";
+// server.js – clean working backend
+
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
 import OpenAI from "openai";
 
+// Load environment variables from Render / .env
+dotenv.config();
+
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// OpenAI client using your Render environment variable
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Health check route
+// Simple health-check route
 app.get("/", (req, res) => {
   res.send("Tarot backend is live ✨");
 });
 
-// Main tarot reading route
-app.post("/reading", async (req, res) => {
+// Set up OpenAI client (make sure OPENAI_API_KEY is set in Render)
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Main tarot reading endpoint
+app.post("/api/interpret", async (req, res) => {
   try {
-    const { cards, question } = req.body || {};
+    const { spreadType, question, cards } = req.body;
 
-    const safeQuestion =
-      question && question.trim().length > 0
-        ? question.trim()
-        : "No specific question. Give general guidance.";
+    const spreadText = spreadType || "3-card Past / Present / Future";
 
-    const cardList = Array.isArray(cards)
-      ? cards.join(", ")
-      : JSON.stringify(cards);
+    const cardSummary = Array.isArray(cards)
+      ? cards
+          .map((card, i) => {
+            const pos = card.position || `Card ${i + 1}`;
+            const name = card.name || "Unknown card";
+            const meaning = card.meaning || "";
+            return `${pos}: ${name} – ${meaning}`;
+          })
+          .join("\n")
+      : "No card details provided.";
+
+    const userQuestion = question || "No specific question; give a general reading.";
 
     const prompt = `
 You are an intuitive, kind tarot reader.
-Give a clear, empowering reading based on the user's question and cards.
 
-Question: ${safeQuestion}
-Cards: ${cardList}
+Spread type: ${spreadText}
+Question / focus: ${userQuestion}
 
-Structure:
-1. Overall energy (2–3 sentences)
-2. What the cards are trying to tell them
-3. 3–5 practical next steps
-Keep it encouraging. No doom, no scary predictions.
-    `.trim();
+Cards drawn:
+${cardSummary}
 
-    const response = await client.responses.create({
+Please:
+1. Give a short overall theme of the reading.
+2. Give 2–3 paragraphs of insight in plain language.
+3. Finish with 2–3 practical action steps.
+Keep it supportive and grounded, not doom-y or overly mystical.
+`;
+
+    const response = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: prompt,
     });
 
     const text =
       response.output?.[0]?.content?.[0]?.text ||
-      "I sense a turning point ahead. Trust your intuition and stay open to small changes you can control.";
+      "I’m sorry, I couldn’t generate a reading.";
 
-    res.json({ reading: text });
+    res.json({ interpretation: text });
   } catch (err) {
-    console.error("Tarot AI error:", err);
-    res.status(500).json({ error: "Failed to generate tarot reading." });
+    console.error("Error in /api/interpret:", err);
+    res.status(500).json({
+      error: "Failed to generate tarot reading.",
+      details: err.message || String(err),
+    });
   }
 });
 
-// Use Render's port or default to 3000 locally
-const PORT = process.env.PORT || 3000;
+// Start server
 app.listen(PORT, () => {
   console.log(`Tarot backend listening on port ${PORT}`);
 });

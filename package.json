@@ -2,7 +2,6 @@
   "name": "official-backend-tarot",
   "version": "1.0.0",
   "description": "Backend for AI tarot readings",
-  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -14,3 +13,4 @@
     "openai": "^4.77.0"
   }
 }
+

@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "main": "server.js",
+
+  "engines": {
+    "node": "18.x"
+  },
+
   "scripts": {
     "start": "node server.js"
   },
@@ -12,4 +17,3 @@
     "openai": "^4.56.0"
   }
 }
-

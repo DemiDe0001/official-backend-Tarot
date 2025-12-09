@@ -1,51 +1,41 @@
+// server.js
 import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
 
 const app = express();
+const port = process.env.PORT || 10000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const client = new OpenAI({
+// OpenAI client
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Simple health check route
+// Health check
 app.get("/", (req, res) => {
-  res.send("Arcana tarot backend is live ✨");
+  res.send("Arcana backend is live.");
 });
 
+// 🔮 Tarot AI interpret endpoint
 app.post("/api/interpret", async (req, res) => {
   try {
-    const { spreadType, question, cards, prompt } = req.body;
+    const { prompt } = req.body;
 
     if (!prompt) {
-      return res
-        .status(400)
-        .json({ error: "Missing prompt in request body." });
+      return res.status(400).json({ error: "Missing prompt." });
     }
 
-    if (!Array.isArray(cards) || cards.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "Cards array is required and cannot be empty." });
-    }
-
-    console.log("🔮 /api/interpret hit with:", {
-      spreadType,
-      question,
-      cardsCount: cards.length,
-    });
-
-  
-    const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
           content:
-            "You are a warm, grounded, empowering tarot reader. You avoid medical, legal, or strict financial advice. You speak in encouraging, reflective language and never sound fatalistic.",
+            "You are a kind, grounded, intuitive tarot reader. You explain cards gently and practically.",
         },
         {
           role: "user",
@@ -53,27 +43,71 @@ app.post("/api/interpret", async (req, res) => {
         },
       ],
       temperature: 0.8,
+      max_tokens: 700,
     });
 
-    const reading = completion?.choices?.[0]?.message?.content?.trim();
-
-    if (!reading) {
-      console.error("❌ No reading content returned from OpenAI");
-      return res
-        .status(500)
-        .json({ error: "AI did not return a reading text." });
-    }
+    const reading =
+      completion.choices?.[0]?.message?.content?.trim() ||
+      "I couldn’t tune into this spread, please try again with a clearer question.";
 
     res.json({ reading });
   } catch (err) {
-    console.error("💥 Error in /api/interpret:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to generate reading from the AI backend." });
+    console.error("Error in /api/interpret:", err);
+    res.status(500).json({ error: "Failed to generate reading." });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✨ Arcana backend listening on port ${PORT}`);
+// 💌 Membership signup endpoint
+app.post("/api/membership", async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      street,
+      city,
+      state,
+      zip,
+      zodiac,
+      usage,
+    } = req.body;
+
+    if (!name || !email || !street || !city || !state || !zip) {
+      return res.status(400).json({
+        error: "Missing required fields (name, email, address).",
+      });
+    }
+
+    // For now we just log the membership data.
+    // 🔗 Later you can:
+    // - save to a database (Supabase, MongoDB, PostgreSQL, etc.)
+    // - send a notification email to yourself
+    // - trigger a welcome email flow
+    console.log("🆕 New Arcana Membership signup:", {
+      name,
+      email,
+      street,
+      city,
+      state,
+      zip,
+      zodiac,
+      usage,
+      createdAt: new Date().toISOString(),
+    });
+
+    // Respond back to the frontend
+    res.json({
+      success: true,
+      message:
+        "Membership details received. Connect this endpoint to your database + payment system next.",
+    });
+  } catch (err) {
+    console.error("Error in /api/membership:", err);
+    res.status(500).json({
+      error: "Failed to process membership. Please try again.",
+    });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Arcana backend listening on port ${port}`);
 });
